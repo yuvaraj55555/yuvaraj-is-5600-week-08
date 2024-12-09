@@ -96,80 +96,49 @@ describe('The Express Server', () => {
 });
 ```
 
-Now, on your own, add a test for the `/orders` route. It should look very similar to the `/products` route test we just wrote. We want to check that the route exists,
-and that it returns a 200 response. 
+Now, on your own, add a test for the `/orders` route. It should look very similar to the `/products` route test we just wrote. We want to check that the route exists, and that it returns a 200 response.
 
-Excellent, now we could continue to write smoke tests for the API, and there is value in that, but if we were to disconnect the `Products` or `Orders` modules from the API
-controller, our tests would fail. We'd have no way to verify that our `Products` or `Orders` modules worked correctly. So instead, let's begin to write some tests for the `Products` module.
+Excellent, now we could continue to write smoke tests for the API, and there is value in that, but if we were to disconnect the `Products` or `Orders` modules from the API controller, our tests would fail. We'd have no way to verify that our `Products` or `Orders` modules worked correctly. So instead, let's begin to write some tests for the Products module.
 
-Before we continue with more complex tests, we need to ensure our database has some test data to work with. Create a new file called `load-test-data.js` in your project root:
+6. Create a new test file to contain our test suite: `tests/products.test.js`. Now, we want to first make sure we actually have some data to work with. We have a helper utility already in place to load test data into the database. Let's use that instead of writing out our own test data. You can view the helper in the `test-utils` directory.
+
+This helper does a few things:
+- It loads the test data into the database
+- It provides a function to clean up the test data after all tests have completed
+
+Now we can use this helper in our test suite. Create `tests/products.test.js`:
 
 ```js
-const fs = require('fs/promises');
-const cuid = require('cuid');
-const Products = require('./products');
-const Orders = require('./orders');
+// tests/products.test.js
+const productTestHelper = require('./test-utils/productTestHelper');
+const { list } = require('../products');
 
-// This function will load test data if the database is empty
-Products.list().then((products) => {
-    if (products.length === 0) {
-        console.log('No products found, loading from file');
-        fs.readFile('data/products.json', 'utf-8').then((data) => {
-            const products = JSON.parse(data);
-            products.forEach((product) => {
-                if (!product.price) {
-                    product.price = Math.floor(Math.random() * 100) + 1; // Set random price between 1 and 100
-                }
-                console.log('Creating product', product);
-                Products.create(product);
-            });
-        }).then(() => {
-            // Create 5 test orders using the products
-            Products.list().then((products) => {
-                if (products.length > 0) {
-                    for (let i = 0; i < 5; i++) {
-                        const order = {
-                            _id: cuid(),
-                            buyerEmail: `buyer${i}@example.com`,
-                            products: [products[Math.floor(Math.random() * products.length)]._id],
-                            status: 'CREATED'
-                        };
-                        console.log('Creating order', order);
-                        Orders.create(order);
-                    }
-                }
-            });
-        });
-    }
+describe('Product Module', () => {
+  // Set up and clean up test data
+  beforeAll(async () => {
+    await productTestHelper.setupTestData();
+  });
+
+  afterAll(async () => {
+    await productTestHelper.cleanupTestData();
+  });
+
+  // your tests go here
 });
 ```
 
-Now run this script to populate your database:
+This setup provides several benefits:
+1. Separates test data management into a reusable helper
+2. Properly cleans up test data after tests complete
+3. Makes the test file cleaner and more focused on test cases
+4. Allows other test files to reuse the same data setup/cleanup logic
 
-```bash
-node load-test-data.js
-```
+The `beforeAll` and `afterAll` hooks ensure that:
+- Test data is loaded once before any tests run
+- All test data is cleaned up after tests complete
+- The database is left in a clean state for the next test run
 
-This script does two important things:
-1. It checks if there are any products in the database
-2. If the database is empty, it:
-   - Loads product data from your JSON file
-   - Creates products with random prices if needed
-   - Creates 5 test orders using random products
-
-Having this test data is crucial for our integration tests, as they need actual data to verify the functionality of our database operations.
-
-6. Now that we have test data, let's begin writing tests for the `Products` module. Create a new test file to contain our test suite: `tests/products.test.js`. This file will be used to house our Products tests. In the file, we'll need to establish our test suite and setup some config:
-
-```js
-// tests/product.test.js
-const { create, get, list, edit, destroy } = require('../products');
-const db = require('../db'); 
-
-describe('Product Module', () => {
-  // your tests go here
-})
-```
+So now when you run `npm run test`, Jest will call `setupTestData()` before running any tests, and call `cleanupTestData()` after all tests complete. Now open your terminal and run `npm run test` again to verify that your test suite works. 
 
 Next, we'll add our first test. This test will verify that we can retireve a list of products from the database:
 
@@ -185,7 +154,7 @@ describe('list', () => {
 });
 ```
 
-Now open your terminal and run `npm run test` again to verify that your test suite works. You should see an output simialr to this:
+Now when we review the test results, we should see something like this:
 
 ```
 Test Suites: 2 passed, 2 total
@@ -194,7 +163,7 @@ Snapshots:   0 total
 Time:        5.341 s
 ```
 
-Now this is fine, but things will get tricky if we start to test getting, creating or deleting individual products. This is because our test are actually integrationt tests, using the actual MongoDB database to run requests against. If we were to do something like this below: 
+Now this is fine, but things will get tricky if we start to test getting, creating or deleting individual products. This is because our test are actually integration tests, using the actual MongoDB database to run requests against. If we were to do something like this below: 
 
 ```js
 describe('get', () => {
@@ -223,6 +192,8 @@ the product would be deleted after the test. That would mean we would never be a
 
 So in our next step, let's setup some mocking. Using mocks we can isolate the unit of work we are testing, ensuring that tests run quickly and are not affected by external dependencies (such as deletes on our database).
 
+** Note: ** In this lab, we are actually setting up and tearing down the database to ensure that all tests are run with a clean state. However, we do not always have the option to do this, especially if we are using a shared database or an external database. In those cases, we can use mocks to simulate the behavior of the database. The rest of this lab will be focused on using mocks to simulate the behavior of the database.
+
 7. To configure our test to use mocks, we'll need to begin by defining the mock callback. At a high level, a mock is a simulated object or function that mimics the behavior of real objects in controlled ways. It's a kind of test double, which is a generic term for any case where you replace a production object for testing purposes.
 
 So let's configure our mocks. First we'll need to create a new file to hold the mocks: `tests/db.mock.js`. Next add the following to the file:
@@ -230,52 +201,74 @@ So let's configure our mocks. First we'll need to create a new file to hold the 
 ```js
 // tests/db.mock.js
 
-// This object represents a mock of a Mongoose Query.
-// Each method (sort, skip, limit, and exec) is mocked to return a predictable value,
-// enabling the testing of method chaining and query execution.
+/**
+ * Mock data to be returned by our mock database queries.
+ * This simulates the documents we'd typically get from MongoDB.
+ */
+const mockProducts = [
+    { description: 'Product 1' },
+    { description: 'Product 2' }
+];
+
+/**
+ * Mock Mongoose Query object.
+ * This simulates Mongoose's chainable query interface.
+ * For example, in real Mongoose you can do: Model.find().sort().skip().limit()
+ * 
+ * mockReturnThis() is used to make methods chainable by returning 'this'
+ * exec() and then() both resolve with our mockProducts to simulate a DB response
+ */
 const mockQuery = {
-  sort: jest.fn().mockReturnThis(),
-  skip: jest.fn().mockReturnThis(),
-  limit: jest.fn().mockReturnThis(),
-  exec: jest.fn().mockResolvedValue([{ description: 'Product 1' }, { description: 'Product 2' }]),
+    sort: jest.fn().mockReturnThis(),  // Returns 'this' to allow chaining
+    skip: jest.fn().mockReturnThis(),  // Returns 'this' to allow chaining
+    limit: jest.fn().mockReturnThis(), // Returns 'this' to allow chaining
+    exec: jest.fn().mockResolvedValue(mockProducts),  // Simulates DB query execution
+    then: function(resolve) { resolve(mockProducts) }  // Makes the query thenable (Promise-like)
 };
 
-
-// This object represents a mock of a Mongoose Model.
-// The find and findById methods are mocked to return the mockQuery object,
-// while save and deleteOne are simply mocked as empty functions.
-// This setup allows testing the behavior of model methods and query execution.
+/**
+ * Mock Mongoose Model object.
+ * This simulates the methods available on a Mongoose model (e.g., Product model).
+ * The find() method returns our mockQuery to allow for method chaining.
+ */
 const mockModel = {
-  find: jest.fn().mockReturnValue(mockQuery),
-  findById: jest.fn(),
-  save: jest.fn(),
-  deleteOne: jest.fn(),
+    find: jest.fn().mockReturnValue(mockQuery)
+};
+
+/**
+ * Mock DB object that simulates the mongoose db interface.
+ * In real code, we use db.model('Product') to get the Product model.
+ * Here, we return our mockModel whenever model() is called.
+ */
+const mockDb = {
+    model: jest.fn().mockReturnValue(mockModel)
 };
 
 module.exports = {
-  mockModel,
-  mockQuery,
+    mockDb,        
+    mockProducts, 
+    mockModel,     
+    mockQuery     
 };
+
 ```
 
 Next, let's update our `product.test.js` file so that it uses our mocks instead of the actual database module.
 
 ```js
 // tests/product.test.js
-const { mockModel } = require('./db.mock');
-const { create, get, list, edit, destroy } = require('../products');
+const { mockDb, mockProducts } = require('./db.mock');
+const { list } = require('../products');
 
-jest.mock('../db', () => ({
-  model: jest.fn().mockReturnValue(mockModel),
-}));
+// Mock the db module to use our mockDb
+jest.mock('../db', () => mockDb);
 
 describe('Product Module', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  // other tests here ... 
+    // your tests go here
 });
 ```
 
@@ -287,12 +280,12 @@ Lastly, we'll need to modify our test that checks for the list of products to be
 
 // replace your current list test with this below:
   describe('list', () => {
-    it('should list products', async () => {
-      const products = await list();
-      expect(products.length).toBe(2);
-      expect(products[0].description).toBe('Product 1');
-      expect(products[1].description).toBe('Product 2');
-    });
+      it('should list products', async () => {
+          const products = await list();
+          expect(products.length).toBe(2);
+          expect(products[0].description).toBe('Product 1');
+          expect(products[1].description).toBe('Product 2');
+      });
   });
 ```
 
@@ -317,25 +310,27 @@ Next, let's create a new test suite file for our orders: `tests/orders.test.js`.
 // tests/orders.test.js
 const { create, get, list, edit } = require('../orders');
 const orderData = require('../data/order1.json');
-const { create: createProduct } = require('../products');
-const productData = require('../data/product1.json');
+const productTestHelper = require('../test-utils/productTestHelper');
 
 describe('Orders Module', () => {
+ 
   let createdProduct;
   let createdOrder;
 
   // Populate the database with dummy data
   beforeAll(async () => {
-    // Create a product and capture it
-    createdProduct = await createProduct(productData);
-    // Use the product id and pass it to the order data product id array;
-    orderData.products = [createdProduct._id];
+    await productTestHelper.setupTestData();
+    await productTestHelper.createTestOrders(5);
+  });
+
+  afterAll(async () => {
+    await productTestHelper.cleanupTestData();
   });
 
   describe('list', () => {
     it('should list orders', async () => {
       const orders = await list();
-      expect(orders.length).toBeGreaterThan(0);
+      expect(orders.length).toBeGreaterThan(4);
     });
   });
 });
@@ -348,8 +343,6 @@ but nothing has been created. Let's remedy this with a quick tests to create an 
 
 ```js
 // tests/orders.test.js
-
-// insert this before our "list" test
 
 describe('create', () => {
     it('should create an order', async () => {
@@ -424,7 +417,7 @@ While writing out the mocks, it should be apparent one of the downsides of mocki
 
 ## Guidance and Testing
 
-1. This lab does not require that you have a connection to your MongoDB cluster from Week 5. We will be using an in-memory database.
+1. You can re-run your tests using the `npm run test` command. Or you can run `npm run test --watch` to run tests as you make changes.
 2. For this lab you will be using the terminal in your Codespace. This is not to be confused with the Console. Please make sure you are calling commands from the terminal.
 
 ## Submission
