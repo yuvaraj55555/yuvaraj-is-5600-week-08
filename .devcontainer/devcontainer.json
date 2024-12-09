@@ -1,0 +1,47 @@
+{
+    "name": "IS 5600 - Lab 8",
+    // "image": "mcr.microsoft.com/devcontainers/universal:2",
+    // "hostRequirements": {
+    //   "cpus": 4
+    // },
+    "waitFor": "onCreateCommand",
+    "updateContentCommand": "npm install",
+    
+    "dockerComposeFile": "docker-compose.yml",
+      "service": "app",
+      "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  
+    "postAttachCommand": {
+      "server": "npm start"
+    },
+    // Configure tool-specific properties.
+    "customizations": {
+      "codespaces": {
+        "openFiles": ["app.js"]
+      },
+      // Configure properties specific to VS Code.
+      "vscode": {
+        "settings": {},
+        "extensions": [
+          "streetsidesoftware.code-spell-checker",
+          "mongodb.mongodb-vscode"
+        ]
+      }
+    },
+    "portsAttributes": {
+      "3000": {
+        "label": "Application",
+        "onAutoForward": "openPreview"
+      },
+      "27017": {
+        "label": "MongoDB",
+        "onAutoForward": "notify"
+      }
+    },
+    "forwardPorts": [3000, 27017],
+    "containerEnv": {
+      "MONGO_INITDB_ROOT_USERNAME": "root",
+      "MONGO_INITDB_ROOT_PASSWORD": "example"
+    },
+    
+  }
