@@ -5,14 +5,14 @@
     //   "cpus": 4
     // },
     "waitFor": "onCreateCommand",
-    "updateContentCommand": "npm install",
+    "updateContentCommand": "npm run test",
     
     "dockerComposeFile": "docker-compose.yml",
       "service": "app",
       "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
   
     "postAttachCommand": {
-      "server": "npm start"
+      "server": "npm run test"
     },
     // Configure tool-specific properties.
     "customizations": {

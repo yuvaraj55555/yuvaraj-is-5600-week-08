@@ -102,7 +102,64 @@ and that it returns a 200 response.
 Excellent, now we could continue to write smoke tests for the API, and there is value in that, but if we were to disconnect the `Products` or `Orders` modules from the API
 controller, our tests would fail. We'd have no way to verify that our `Products` or `Orders` modules worked correctly. So instead, let's begin to write some tests for the `Products` module.
 
-6. Begin by creating a new test file to contain our test suite: `tests/products.test.js`. This file will be used to house our Products tests. In the file, we'll need to establish our test suite and setup some config:
+Before we continue with more complex tests, we need to ensure our database has some test data to work with. Create a new file called `load-test-data.js` in your project root:
+
+```js
+const fs = require('fs/promises');
+const cuid = require('cuid');
+const Products = require('./products');
+const Orders = require('./orders');
+
+// This function will load test data if the database is empty
+Products.list().then((products) => {
+    if (products.length === 0) {
+        console.log('No products found, loading from file');
+        fs.readFile('data/products.json', 'utf-8').then((data) => {
+            const products = JSON.parse(data);
+            products.forEach((product) => {
+                if (!product.price) {
+                    product.price = Math.floor(Math.random() * 100) + 1; // Set random price between 1 and 100
+                }
+                console.log('Creating product', product);
+                Products.create(product);
+            });
+        }).then(() => {
+            // Create 5 test orders using the products
+            Products.list().then((products) => {
+                if (products.length > 0) {
+                    for (let i = 0; i < 5; i++) {
+                        const order = {
+                            _id: cuid(),
+                            buyerEmail: `buyer${i}@example.com`,
+                            products: [products[Math.floor(Math.random() * products.length)]._id],
+                            status: 'CREATED'
+                        };
+                        console.log('Creating order', order);
+                        Orders.create(order);
+                    }
+                }
+            });
+        });
+    }
+});
+```
+
+Now run this script to populate your database:
+
+```bash
+node load-test-data.js
+```
+
+This script does two important things:
+1. It checks if there are any products in the database
+2. If the database is empty, it:
+   - Loads product data from your JSON file
+   - Creates products with random prices if needed
+   - Creates 5 test orders using random products
+
+Having this test data is crucial for our integration tests, as they need actual data to verify the functionality of our database operations.
+
+6. Now that we have test data, let's begin writing tests for the `Products` module. Create a new test file to contain our test suite: `tests/products.test.js`. This file will be used to house our Products tests. In the file, we'll need to establish our test suite and setup some config:
 
 ```js
 // tests/product.test.js
