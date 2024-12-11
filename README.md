@@ -310,7 +310,7 @@ Next, let's create a new test suite file for our orders: `tests/orders.test.js`.
 // tests/orders.test.js
 const { create, get, list, edit } = require('../orders');
 const orderData = require('../data/order1.json');
-const productTestHelper = require('../test-utils/productTestHelper');
+const productTestHelper = require('./test-utils/productTestHelper');
 
 describe('Orders Module', () => {
  
