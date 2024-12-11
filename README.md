@@ -418,7 +418,12 @@ While writing out the mocks, it should be apparent one of the downsides of mocki
 ## Guidance and Testing
 
 1. You can re-run your tests using the `npm run test` command. Or you can run `npm run test --watch` to run tests as you make changes.
-2. For this lab you will be using the terminal in your Codespace. This is not to be confused with the Console. Please make sure you are calling commands from the terminal.
+2. If your tests are failing, and you cannot determine why, verify that you've not accidently imported from the `node:test` library: 
+```js
+// No imports from `node:test`
+const { describe, it } = require('node:test');
+```
+3. For this lab you will be using the terminal in your Codespace. This is not to be confused with the Console. Please make sure you are calling commands from the terminal.
 
 ## Submission
 
